@@ -1,0 +1,181 @@
+﻿
+
+
+body {
+    background-color: #f0f2f5;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-top: 20px;
+}
+
+.chat-app {
+    display: flex;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    background-color: #fff;
+}
+
+.sidebar {
+    width: 300px;
+    background-color: #fff;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+}
+
+    .sidebar h3 {
+        background-color: #075E54;
+        color: white;
+        padding: 15px;
+        margin: 0;
+        text-align: center;
+    }
+
+    .sidebar .form-group,
+    .sidebar .btn {
+        margin: 10px;
+    }
+
+.sidebar-section {
+    margin-top: 20px;
+}
+
+    .sidebar-section h4 {
+        padding: 10px;
+        background-color: #25D366;
+        color: white;
+        margin: 0;
+        text-align: center;
+    }
+
+.sidebar-item {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+    .sidebar-item:hover {
+        background-color: #f1f1f1;
+    }
+
+.chat-container {
+    flex-grow: 1;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header {
+    background-color: #075E54;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .chat-header h2 {
+        margin: 0;
+    }
+
+.chat-box {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    background-color: #584d5c;
+    background-image: url("https://www.transparenttextures.com/patterns/skulls.png");
+    /* This is mostly intended for prototyping; please download the pattern and re-host for production environments. Thank you! */
+}
+
+.chat-message {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 60%;
+    animation: fadeIn 0.5s;
+}
+
+    .chat-message.self {
+        background-color: #dcf8c6;
+        color: #000;
+        align-self: flex-end;
+        text-align: right;
+    }
+
+    .chat-message.other {
+        background-color: #fff;
+        color: #000;
+        align-self: flex-start;
+        text-align: left;
+    }
+
+
+
+.chat-input {
+    padding: 10px;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+}
+
+.input-group,
+.custom-file {
+    margin-top: 10px;
+}
+
+.input-group-append {
+    display: flex;
+}
+
+.custom-file-label::after {
+    content: "Browse";
+}
+
+.custom-file {
+    overflow: hidden;
+}
+
+.custom-file-input {
+    z-index: 1;
+    cursor: pointer;
+    position: relative;
+    opacity: 0;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .btn i {
+        margin-right: 5px;
+    }
+
+#typingIndicator {
+    height: 20px;
+    padding: 5px;
+    font-style: italic;
+    color: #888;
+}
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+

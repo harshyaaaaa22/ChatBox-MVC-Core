@@ -1,0 +1,426 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Real-Time Chat with SignalR</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.13/signalr.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="~/css/StyleSheet.css">
+</head>
+<body>
+    <div class="container">
+        <div class="chat-app">
+            <div class="sidebar">
+                <h3>Chat Settings</h3>
+                <div class="form-group px-3">
+                    <label for="username">Select Your Name:</label>
+                    <select id="username" class="form-control">
+                        <option value="">Choose your name</option>
+                        <option value="Nilesh Patil">Nilesh Patil</option>
+                        <option value="Suraj Panchal">Suraj Panchal</option>
+                        <option value="Omkar Chavan">Omkar Chavan</option>
+                        <option value="Harsh Jadhav">Harsh Jadhav</option>
+                    </select>
+                </div>
+                <div class="sidebar-section">
+                    <h4>Groups</h4>
+                    <div id="groupsList">
+                        <div class="sidebar-item" data-group="MBA">MBA</div>
+                        <div class="sidebar-item" data-group="MCA">MCA</div>
+                        <div class="sidebar-item" data-group="BCA">BCA</div>
+                        <div class="sidebar-item" data-group="BCS">BCS</div>
+                        <div class="sidebar-item" data-group="MSC(Physics)">MSC(Physics)</div>
+                    </div>
+                </div>
+                <div class="sidebar-section">
+                    <h4>Users</h4>
+                    <div id="usersList">
+
+                        <div class="sidebar-item" data-user="Nilesh Patil">Nilesh Patil</div>
+                        <div class="sidebar-item" data-user="Suraj Panchal">Suraj Panchal</div>
+                        <div class="sidebar-item" data-user="Omkar Chavan">Omkar Chavan</div>
+                        <div class="sidebar-item" data-user="Harsh Jadhav">Harsh Jadhav</div>
+                     
+                        
+                    </div>
+                </div>
+            </div>
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h2 id="chatTitle">Chat</h2>
+                   
+                </div>
+                <div id="chatBox" class="chat-box"></div>
+
+                <div class="chat-input">
+                    <div id="typingIndicator"></div>
+                    <div class="input-group">
+                       
+                        <input type="text" id="message" class="form-control" placeholder="Enter your message" />
+                        <div class="input-group-append">
+                            <button id="sendButton" class="btn btn-success">
+                                <i class="fas fa-paper-plane"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-group mt-3">
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="fileInput">
+                            <label class="custom-file-label form-control" for="fileInput">Choose file</label>
+                        </div>
+                    </div>
+                    <div id="filePreview" class="mt-3"></div>
+                    <div class="input-group-append">
+                       
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        $(document).ready(function () {
+            var connection = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
+            var currentUser = "";
+            var currentGroup = "";
+            var currentRecipient = "";
+            var typingTimeout;
+            var typingDelay = 3000; // 3 seconds delay
+
+            // Load messages for the current chat
+            function loadMessages(chatId) {
+                var savedMessages = localStorage.getItem(chatId);
+                if (savedMessages) {
+                    $("#chatBox").html(savedMessages);
+                    $("#chatBox").scrollTop($("#chatBox")[0].scrollHeight); // Scroll to bottom
+                } else {
+                    $("#chatBox").html(""); // Clear the chatBox if no messages found
+                }
+            }
+
+            function saveMessages(chatId) {
+                localStorage.setItem(chatId, $("#chatBox").html());
+            }
+
+            function addMessage(user, message, messageId, messageClass) {
+                var senderName = user === currentUser ? "You" : user;
+                var deleteIcon = user === currentUser ? "<i class='fas fa-trash delete-icon' data-message-id='" + messageId + "'></i>" : "";
+                $("#chatBox").append("<div class='chat-message " + messageClass + "' id='" + messageId + "'><strong>" + senderName + "</strong>: " + message + " " + deleteIcon + "</div>");
+                $("#chatBox").scrollTop($("#chatBox")[0].scrollHeight); // Scroll to bottom
+                saveMessages(currentGroup ? "group_" + currentGroup : "private_" + currentUser + "_" + currentRecipient);
+            }
+
+
+
+            function deleteMessage(messageId) {
+                $("#" + messageId).remove();
+                saveMessages(currentGroup ? "group_" + currentGroup : "private_" + currentUser + "_" + currentRecipient);
+            }
+
+            $("#fileInput").change(function () {
+                var fileInput = $(this)[0];
+                var file = fileInput.files[0];
+                if (file) {
+                    var fileReader = new FileReader();
+                    fileReader.onload = function (e) {
+                        var fileUrl = e.target.result;
+                        var fileExtension = file.name.split('.').pop().toLowerCase();
+                        var fileTag = '';
+
+                        if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(fileExtension)) {
+                            fileTag = "<img src='" + fileUrl + "' alt='" + file.name + "' style='max-width: 300px; max-height: 300px;' />";
+                        } else if (['mp4', 'webm', 'ogg'].includes(fileExtension)) {
+                            fileTag = "<video controls style='max-width: 300px; max-height: 300px;'><source src='" + fileUrl + "' type='video/" + fileExtension + "'>Your browser does not support the video tag.</video>";
+                        } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
+                            fileTag = "<audio controls style='max-width: 300px;'><source src='" + fileUrl + "' type='audio/" + fileExtension + "'>Your browser does not support the audio tag.</audio>";
+                        } else {
+                            fileTag = "<a href='" + fileUrl + "' target='_blank'>" + file.name + "</a>";
+                        }
+
+                        $("#filePreview").html("<div class='file-preview'>" + fileTag + "<br><button id='confirmFileButton' class='btn btn-info mt-2'>Confirm</button></div>");
+                        $("#sendFileButton").prop("disabled", false);
+                    };
+                    fileReader.readAsDataURL(file);
+                }
+            });
+
+            $("#filePreview").on("click", "#confirmFileButton", function () {
+                var fileInput = $("#fileInput")[0];
+                var file = fileInput.files[0];
+                var formData = new FormData();
+                formData.append("file", file);
+
+                $.ajax({
+                    url: "/upload",
+                    type: "POST",
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function (response) {
+                        if (currentGroup) {
+                            connection.invoke("SendFile", currentGroup, currentUser, file.name, response.fileUrl).catch(function (err) {
+                                return console.error(err.toString());
+                            });
+                        } else if (currentRecipient) {
+                            connection.invoke("SendPrivateFile", currentUser, currentRecipient, file.name, response.fileUrl).catch(function (err) {
+                                return console.error(err.toString());
+                            });
+                        }
+                        $("#fileInput").val('');
+                        $(".custom-file-label").text("Choose file");
+                        $("#filePreview").html('');
+                        $("#sendFileButton").prop("disabled", true);
+                    },
+                    error: function (err) {
+                        console.error("Error uploading file: ", err);
+                    }
+                });
+            });
+
+            $("#username").change(function () {
+                currentUser = $(this).val();
+                if (currentUser) {
+                    connection.invoke("RegisterUser", currentUser).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                    // Remove the current user from the usersList
+                    $("#usersList .sidebar-item[data-user='" + currentUser + "']").remove();
+                }
+            });
+
+            // Handle group click
+            $("#groupsList").on("click", ".sidebar-item", function () {
+                currentGroup = $(this).data("group");
+                currentRecipient = ""; // Reset private chat when joining a group
+                if (currentGroup) {
+                    connection.invoke("JoinGroup", currentGroup).then(function () {
+                        loadMessages("group_" + currentGroup);
+                        $("#chatTitle").text("Group: " + currentGroup);
+                    }).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                }
+            });
+
+            // Handle user click
+            $("#usersList").on("click", ".sidebar-item", function () {
+                currentRecipient = $(this).data("user");
+                currentGroup = ""; // Reset group chat when starting a private chat
+                if (currentUser && currentRecipient && currentUser !== currentRecipient) {
+                    loadMessages("private_" + currentUser + "_" + currentRecipient);
+                    $("#chatTitle").text("Chat with: " + currentRecipient);
+                } else {
+                    $("#chatBox").html("");
+                }
+            });
+
+            connection.on("ReceiveMessage", function (user, message) {
+                var encodedUser = $("<div />").text(user).html();
+                var encodedMsg = $("<div />").text(message).html();
+                var messageId = "msg_" + new Date().getTime(); // Unique message ID based on timestamp
+                var messageClass = user === currentUser ? 'self' : 'other';
+                addMessage(encodedUser, encodedMsg, messageId, messageClass);
+            });
+
+            connection.on("ReceiveFile", function (user, fileName, fileUrl) {
+                var encodedUser = $("<div />").text(user).html();
+                var fileLink = "<a href='" + fileUrl + "' target='_blank'>" + fileName + "</a>";
+                var fileExtension = fileName.split('.').pop().toLowerCase();
+
+                var fileTag = '';
+                if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(fileExtension)) {
+                    fileTag = "<a href='" + fileUrl + "' target='_blank'><img src='" + fileUrl + "' alt='" + fileName + "' style='max-width: 300px; max-height: 300px;' /></a>";
+                } else if (['mp4', 'webm', 'ogg'].includes(fileExtension)) {
+                    fileTag = "<video controls style='max-width: 300px; max-height: 300px;'><source src='" + fileUrl + "' type='video/" + fileExtension + "'>Your browser does not support the video tag.</video>";
+                } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
+                    fileTag = "<audio controls style='max-width: 300px;'><source src='" + fileUrl + "' type='audio/" + fileExtension + "'>Your browser does not support the audio tag.</audio>";
+                } else {
+                    fileTag = fileLink;
+                }
+
+                var messageId = "msg_" + new Date().getTime(); // Unique message ID based on timestamp
+                var messageClass = user === currentUser ? 'self' : 'other';
+                addMessage(encodedUser, fileTag, messageId, messageClass);
+            });
+
+            connection.on("ReceivePrivateMessage", function (sender, recipient, message) {
+                if ((sender === currentUser && recipient === currentRecipient) ||
+                    (sender === currentRecipient && recipient === currentUser)) {
+                    var encodedSender = $("<div />").text(sender).html();
+                    var encodedMsg = $("<div />").text(message).html();
+                    var messageId = "msg_" + new Date().getTime(); // Unique message ID based on timestamp
+                    var messageClass = sender === currentUser ? 'self' : 'other';
+                    addMessage(encodedSender, encodedMsg, messageId, messageClass, true); // Pass 'true' for private chat
+                }
+            });
+
+
+            connection.on("ReceivePrivateFile", function (sender, recipient, fileName, fileUrl) {
+                if ((sender === currentUser && recipient === currentRecipient) ||
+                    (sender === currentRecipient && recipient === currentUser)) {
+                    var encodedSender = $("<div />").text(sender).html();
+                    var fileLink = "<a href='" + fileUrl + "' target='_blank'>" + fileName + "</a>";
+                    var fileExtension = fileName.split('.').pop().toLowerCase();
+
+                    var fileTag = '';
+                    if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(fileExtension)) {
+                        fileTag = "<a href='" + fileUrl + "' target='_blank'><img src='" + fileUrl + "' alt='" + fileName + "' style='max-width: 300px; max-height: 300px;' /></a>";
+                    } else if (['mp4', 'webm', 'ogg'].includes(fileExtension)) {
+                        fileTag = "<video controls style='max-width: 300px; max-height: 300px;'><source src='" + fileUrl + "' type='video/" + fileExtension + "'>Your browser does not support the video tag.</video>";
+                    } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
+                        fileTag = "<audio controls style='max-width: 300px;'><source src='" + fileUrl + "' type='audio/" + fileExtension + "'>Your browser does not support the audio tag.</audio>";
+                    } else {
+                        fileTag = fileLink;
+                    }
+
+                    var messageId = "msg_" + new Date().getTime(); // Unique message ID based on timestamp
+                    var messageClass = sender === currentUser ? 'self' : 'other';
+                    addMessage(encodedSender, fileTag, messageId, messageClass);
+                }
+            });
+
+            connection.on("UserTyping", function (user) {
+                if (user !== currentUser) {
+                    $("#typingIndicator").text(user + " is typing...");
+                    clearTimeout(typingTimeout);
+                    typingTimeout = setTimeout(function () {
+                        $("#typingIndicator").text("");
+                    }, typingDelay);
+                }
+            });
+
+            connection.on("UserTypingPrivate", function (user) {
+                if (user === currentRecipient) {
+                    $("#typingIndicator").text(user + " is typing...");
+                    clearTimeout(typingTimeout);
+                    typingTimeout = setTimeout(function () {
+                        $("#typingIndicator").text("");
+                    }, typingDelay);
+                }
+            });
+
+            $("#sendButton").click(function () {
+                var message = $("#message").val();
+                if (currentGroup) {
+                    connection.invoke("SendMessage", currentGroup, currentUser, message).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                } else if (currentRecipient) {
+                    connection.invoke("SendPrivateMessage", currentUser, currentRecipient, message).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                }
+                $("#message").val("").focus();
+            });
+
+            $("#sendFileButton").click(function () {
+                var fileInput = $("#fileInput")[0];
+                if (fileInput.files.length > 0) {
+                    var file = fileInput.files[0];
+                    var formData = new FormData();
+                    formData.append("file", file);
+                    $.ajax({
+                        url: "/api/FileUpload/upload",
+                        type: "POST",
+                        data: formData,
+                        contentType: false,
+                        processData: false,
+                        success: function (response) {
+                            if (currentGroup) {
+                                connection.invoke("SendFile", currentGroup, currentUser, file.name, response.fileUrl).catch(function (err) {
+                                    return console.error(err.toString());
+                                });
+                            } else if (currentRecipient) {
+                                connection.invoke("SendPrivateFile", currentUser, currentRecipient, file.name, response.fileUrl).catch(function (err) {
+                                    return console.error(err.toString());
+                                });
+                            }
+                            // Reset the file input and its label
+                            $("#fileInput").val('');
+                            $(".custom-file-label").text("Choose file");
+                        },
+                        error: function (err) {
+                            console.error("Error uploading file: ", err);
+                        }
+                    });
+                }
+            });
+
+            $("#message").on("input", function () {
+                if (currentGroup) {
+                    connection.invoke("NotifyTypingGroup", currentGroup, currentUser).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                } else if (currentRecipient) {
+                    connection.invoke("NotifyTypingPrivate", currentUser, currentRecipient).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                }
+            });
+
+            $("#username").change(function () {
+                currentUser = $(this).val();
+                if (currentUser) {
+                    connection.invoke("RegisterUser", currentUser).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                }
+            });
+
+            $("#group").change(function () {
+                currentGroup = $(this).val();
+                currentRecipient = ""; // Reset private chat when joining a group
+                if (currentGroup) {
+                    connection.invoke("JoinGroup", currentGroup).then(function () {
+                        loadMessages("group_" + currentGroup);
+                    }).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                } else {
+                    $("#chatBox").html("");
+                }
+            });
+
+            $("#recipient").change(function () {
+                currentRecipient = $(this).val();
+                currentGroup = ""; // Reset group chat when starting a private chat
+                if (currentUser && currentRecipient && currentUser !== currentRecipient) {
+                    loadMessages("private_" + currentUser + "_" + currentRecipient);
+                } else {
+                    $("#chatBox").html("");
+                }
+            });
+
+            $("#leaveGroupButton").click(function () {
+                if (currentGroup) {
+                    connection.invoke("LeaveGroup", currentGroup).catch(function (err) {
+                        return console.error(err.toString());
+                    });
+                    currentGroup = "";
+                    $("#chatBox").html("");
+                }
+            });
+
+            $("#chatBox").on("click", ".delete-icon", function () {
+                var messageId = $(this).data("message-id");
+                if (confirm("This Msg Is Deleted Only For You ?")) {
+                    deleteMessage(messageId);
+                }
+            });
+
+
+
+            connection.start().then(function () {
+                console.log("Connected!");
+            }).catch(function (err) {
+                return console.error(err.toString());
+            });
+        });
+
+    </script>
+</body>
+</html>
